@@ -1,0 +1,17 @@
+<ui>
+    <menubar name="MenuBar">
+        <menu name="GitMenu" action="GitAction">
+            <menuitem name="OpenGitDirectory" action="OpenGitDirectoryAction"/>
+            <separator/>
+            <menuitem name="Checkout" action="CheckoutAction"/>
+            <menuitem name="Pull" action="PullAction"/>
+            <separator/>
+            <menuitem name="AddToIndex" action="AddToIndexAction"/>
+            <menuitem name="RemoveFromIndex" action="RemoveFromIndexAction"/>
+            <separator/>
+            <menuitem name="CompareRevision" action="CompareRevisionAction"/>
+            <menuitem name="CompareFile" action="CompareFileAction"/>
+            <menuitem name="CompareBranch" action="CompareBranchAction"/>
+        </menu>
+    </menubar>
+</ui>

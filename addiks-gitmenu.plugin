@@ -1,0 +1,9 @@
+[Plugin]
+Loader=python3
+Module=addiks-gitmenu
+IAge=3
+Name=Addiks - Git menu
+Description=Provides a new menu when file is inside git to interact with git. Version 1.0
+Authors=Gerrit Addiks <gerrit@addiks.de>
+Copyright=Copyright (C) 2014 Gerrit Addiks
+Website=http://addiks.net/gedit-plugin-git-menu/
