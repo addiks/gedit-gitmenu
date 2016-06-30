@@ -20,6 +20,40 @@ import os
 import re
 import time
 
+ACTIONS = [
+    ['OpenGitGuiAction',       "Open git GUI",          "", "_on_open_git_gui"],
+    ['OpenGitGAction',         "Open gitg",             "", "_on_open_gitg"],
+    ['OpenGitDirectoryAction', "Open git directory",    "", "_on_open_git_directory"],
+    ['AddToIndexAction',       "Stage to index",        "", "_on_add_to_index"],
+    ['RemoveFromIndexAction',  "Unstage from index",    "", "_on_remove_from_index"],
+    ['PullAction',             "Pull the checkout",     "", "_on_pull"],
+    ['CheckoutAction',         "Checkout this file",    "", "_on_checkout"],
+    ['CompareRevisionAction',  "Open file history",     "", "_on_compare_revision"],
+    ['CompareFileAction',      "Compare with file",     "", "_on_compare_file"],
+    ['CompareBranchAction',    "Compare with branch",   "", "_on_compare_branch"],
+]
+
+class AddiksGitMenuApp(GObject.Object, Gedit.AppActivatable):
+    app = GObject.property(type=Gedit.App)
+
+    def __init__(self):
+        GObject.Object.__init__(self)
+
+    def do_activate(self):
+        if "extend_menu" in dir(self): # build menu for gedit 3.12 (one menu per application)
+            submenu = Gio.Menu()
+            item = Gio.MenuItem.new_submenu(_("Git"), submenu)
+
+            mainMenu = self.app.get_menubar()
+            mainMenu.append_item(item)
+
+            for actionName, title, shortcut, callbackName in ACTIONS:
+                item = Gio.MenuItem.new(title, "win.%s" % actionName)
+                if len(shortcut) > 0:
+                    item.set_attribute_value("accel", GLib.Variant.new_string(shortcut))
+                    self.app.set_accels_for_action("win.%s" % actionName, [shortcut])
+                submenu.append_item(item)
+
 class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
     """ 
     This class represents the plugin's extension points to a gedit window.
@@ -29,6 +63,7 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
 
     def __init__(self):
         GObject.Object.__init__(self)
+        self._gitAction = None
 
     def do_activate(self):
         """ Will be called by gedit, indicates that the plugin should be activated. """
@@ -38,36 +73,36 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
         """ Will build the git-menu in the gedit-menu. """
 
         plugin_path = os.path.dirname(__file__)
-        manager = self.window.get_ui_manager()
-        actions = [
-            ['OpenGitDirectoryAction', "Open git directory",    "", self._on_open_git_directory],
-            ['AddToIndexAction',       "Stage to index",        "", self._on_add_to_index],
-            ['RemoveFromIndexAction',  "Unstage from index",    "", self._on_remove_from_index],
-            ['PullAction',             "Pull the checkout",     "", self._on_pull],
-            ['CheckoutAction',         "Checkout this file",    "", self._on_checkout],
-            ['CompareRevisionAction',  "Open file history",     "", self._on_compare_revision],
-            ['CompareFileAction',      "Compare with file",     "", self._on_compare_file],
-            ['CompareBranchAction',    "Compare with branch",   "", self._on_compare_branch],
-            ['GitAction',              "Git",                   "_Git", None],
-        ]
 
         self._actions = Gtk.ActionGroup("AddiksGitMenuActions")
-        for action in actions:
-            self._actions.add_actions([(action[0], Gtk.STOCK_INFO, action[1], None, action[2], action[3]),])
-            
-        self._gitAction = self._actions.get_action("GitAction")
+        for actionName, title, shortcut, callbackName in ACTIONS:
+            action = Gio.SimpleAction(name=actionName)
+            callback = None
+            if callbackName != None:
+                callback = getattr(self, callbackName)
+                action.connect('activate', callback)
+            self.window.add_action(action)
+            self.window.lookup_action(actionName).set_enabled(True)
 
-        manager.insert_action_group(self._actions)
-        self._ui_merge_id = manager.add_ui_from_string(file_get_contents(plugin_path + "/menubar.xml"))
-        manager.ensure_update()
+            self._actions.add_actions([(actionName, Gtk.STOCK_INFO, title, shortcut, "", callback),])
+
+        if "get_ui_manager" in dir(self.window):# build menu for gedit 3.10 (global menu per window)
+            manager = self.window.get_ui_manager()
+
+            self._gitAction = self._actions.get_action("GitAction")
+
+            manager.insert_action_group(self._actions)
+            self._ui_merge_id = manager.add_ui_from_string(file_get_contents(plugin_path + "/menubar.xml"))
+            manager.ensure_update()
 
     def do_update_state(self):
         """ Called by gedit. Indicates that the state of the document changed. """
 
-        if self._check_in_git(False):
-            self._gitAction.set_visible(True)
-        else:
-            self._gitAction.set_visible(False)
+        if self._gitAction != None:
+            if self._check_in_git(False):
+                self._gitAction.set_visible(True)
+            else:
+                self._gitAction.set_visible(False)
 
         document = self.window.get_active_document()
         path = self._get_git_directory()
@@ -99,17 +134,20 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
                     afterTag = ""
 
                 # get current window title
-                newTitle = title = self.window.get_title()
+                title = self.window.get_title()
 
-                # remove old tag from current title
-                tagPattern = " \[[SM\?]S?\]"
-                if re.match(".*"+tagPattern, title):
-                    newTitle = re.sub(tagPattern, "", title)
-                newTitle = afterTag + newTitle
+                if type(title) == str:
+                    newTitle = title
 
-                # set new title if changed
-                if(title != newTitle):
-                    self.window.set_title(newTitle)
+                    # remove old tag from current title
+                    tagPattern = " \[[SM\?]S?\]"
+                    if re.match(".*"+tagPattern, title):
+                        newTitle = re.sub(tagPattern, "", title)
+                    newTitle = afterTag + newTitle
+
+                    # set new title if changed
+                    if(title != newTitle):
+                        self.window.set_title(newTitle)
             except OSError as error:
                 print(error)
 
@@ -172,6 +210,30 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
         return diff_viewer
 
     ### MENU EVENTS
+
+    def _on_open_gitg(self, action, data=None):
+        """ Opens gitg. """
+
+        if self._check_in_file():
+            gitpath = self._get_git_directory()
+            try:
+                # adds the file to git-index ( = staging)
+                sp = subprocess.Popen(['gitg', gitpath])
+                #sp.wait()
+            except OSError as error:
+                print(error)
+
+    def _on_open_git_gui(self, action, data=None):
+        """ Opens the git-gui. """
+
+        if self._check_in_file():
+            gitpath = self._get_git_directory()
+            try:
+                # adds the file to git-index ( = staging)
+                sp = subprocess.Popen(['git', '--git-dir='+gitpath+'/.git', '--work-tree='+gitpath, 'gui'])
+                #sp.wait()
+            except OSError as error:
+                print(error)
 
     def _on_compare_file(self, action, data=None):
         """ Event called when menu-item 'Compare with file' gets triggered. """

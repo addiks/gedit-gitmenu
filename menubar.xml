@@ -2,6 +2,8 @@
     <menubar name="MenuBar">
         <menu name="GitMenu" action="GitAction">
             <menuitem name="OpenGitDirectory" action="OpenGitDirectoryAction"/>
+            <menuitem name="OpenGitGui" action="OpenGitGuiAction"/>
+            <menuitem name="OpenGitG" action="OpenGitGAction"/>
             <separator/>
             <menuitem name="Checkout" action="CheckoutAction"/>
             <menuitem name="Pull" action="PullAction"/>
