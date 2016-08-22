@@ -3,7 +3,7 @@
  * This package (including this file) was released under the terms of the GPL-3.0.
  * You should have received a copy of the GNU General Public License along with this program.
  * If not, see <http://www.gnu.org/licenses/> or send me a mail so i can send you a copy.
- * 
+ *
  * @license GPL-3.0
  * @author Gerrit Addiks <gerrit@addiks.de>
  * @web http://addiks.net/gedit-plugin-git-menu/
@@ -55,7 +55,7 @@ class AddiksGitMenuApp(GObject.Object, Gedit.AppActivatable):
                 submenu.append_item(item)
 
 class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
-    """ 
+    """
     This class represents the plugin's extension points to a gedit window.
     """
 
@@ -64,6 +64,8 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
     def __init__(self):
         GObject.Object.__init__(self)
         self._gitAction = None
+        self.__cachedGitDirByPath = {}
+        self.__cacheTimestamp = 0.0
 
     def do_activate(self):
         """ Will be called by gedit, indicates that the plugin should be activated. """
@@ -111,7 +113,7 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
             try:
                 # gets the current state of a file (untracked; modified; staged; modified & staged)
                 sp = subprocess.Popen(
-                    ['git', '--git-dir='+path+'/.git', '--work-tree='+path, 'status', '--porcelain', filepath], 
+                    ['git', '--git-dir='+path+'/.git', '--work-tree='+path, 'status', '--porcelain', filepath],
                     stdin=PIPE, stdout=PIPE, stderr=PIPE
                 )
                 sp.wait()
@@ -154,25 +156,38 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
     def _get_git_directory(self):
         """ Gets the absolute path to the work-dir. """
 
+        result = None
+
+        # clear cache at most every 15 seconds
+        if time.time() - 15 > self.__cacheTimestamp:
+            self.__cachedGitDirByPath = {}
+            self.__cacheTimestamp = time.time()
+
         document = self.window.get_active_document()
         if document != None and document.get_location() != None:
             filepath = document.get_location().get_path()
             filepath = os.path.abspath(filepath)
-            while filepath != "/":
-                filepath = os.path.dirname(filepath)
-                if os.path.exists(filepath + "/.git"):
-                    return filepath
-        else:
-            return None
+            if filepath in self.__cachedGitDirByPath:
+                result = self.__cachedGitDirByPath[filepath]
+            else:
+                currentPath = filepath
+                while currentPath != "/":
+                    currentPath = os.path.dirname(currentPath)
+                    if os.path.exists(currentPath + "/.git"):
+                        result = currentPath
+                        break
+                self.__cachedGitDirByPath[filepath] = result
+
+        return result
 
     def _check_in_file(self, doAlert=True):
-        """ 
+        """
         Checks if the current document is in a file on disk.
-        If not (and doAlert is True), then an alert-dialog will be displayed. 
+        If not (and doAlert is True), then an alert-dialog will be displayed.
         """
 
         document = self.window.get_active_document()
-        if(document == None or 
+        if(document == None or
            document.get_location == None or
            document.get_location() == None):
             if doAlert:
@@ -182,11 +197,11 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
             return False
         else:
             return True
-        
+
     def _check_in_git(self, doAlert=True):
-        """ 
+        """
         Checks if the current document is in a git work-dir.
-        If not (and doAlert is True), then an alert-dialog will be displayed. 
+        If not (and doAlert is True), then an alert-dialog will be displayed.
         """
 
         gitpath = self._get_git_directory()
@@ -261,7 +276,7 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
                     print(error)
 
             chooser.destroy()
-        
+
     def _on_compare_branch(self, action, data=None):
         """ Event called when menu-item 'Compare with branch' gets triggered. """
 
@@ -271,7 +286,7 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
             filepath = document.get_location().get_path()
             compare = CompareBranchWindow(gitpath, filepath)
             compare.set_diff_viewer(self._get_diff_viewer())
-    
+
     def _on_compare_revision(self, action, data=None):
         """ Event called when menu-item 'Open file history' gets triggered. """
 
@@ -281,7 +296,7 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
             filepath = document.get_location().get_path()
             compare = CompareRevisionWindow(gitpath, filepath)
             compare.set_diff_viewer(self._get_diff_viewer())
-   
+
     def _on_open_git_directory(self, action, data=None):
         """ Event called when menu-item 'Open git directory' gets triggered. """
 
@@ -305,7 +320,7 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
             except OSError as error:
                 print(error)
             self.do_update_state()
-            
+
     def _on_remove_from_index(self, action, data=None):
         """ Event called when menu-item 'Remove from index / unstage' gets triggered. """
 
@@ -320,18 +335,18 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
             except OSError as error:
                 print(error)
             self.do_update_state()
-            
+
     def _on_pull(self, action, data=None):
         """
         Event called when menu-item 'pull' gets triggered.
-        ('git pull' will always pull the entire work-dir, not only the open file.)        
+        ('git pull' will always pull the entire work-dir, not only the open file.)
         """
 
         if self._check_in_git():
             gitpath = self._get_git_directory()
             try:
                 # pulls the work-dir from git remote.
-                sp = subprocess.Popen(['git', '--git-dir='+gitpath+'/.git', '--work-tree='+gitpath, 'pull'], 
+                sp = subprocess.Popen(['git', '--git-dir='+gitpath+'/.git', '--work-tree='+gitpath, 'pull'],
                     stdin=PIPE, stdout=PIPE, stderr=PIPE
                 )
                 sp.wait()
@@ -355,9 +370,9 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
             except OSError as error:
                 print(error)
             self.do_update_state()
-            
+
     def _on_checkout(self, action, data=None):
-        """ 
+        """
         Event called when menu-item 'checkout' gets triggered.
         This will revert all modifications and put the file back into 'unchanged' state.
         (Does not revert staging)
@@ -376,4 +391,3 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
             except OSError as error:
                 print(error)
             self.do_update_state()
-            
