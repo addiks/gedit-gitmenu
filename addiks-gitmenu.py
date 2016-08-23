@@ -16,6 +16,7 @@ from compare_branch_window import CompareBranchWindow
 from helpers import group, file_get_contents
 import subprocess
 from subprocess import Popen, PIPE
+from _thread import start_new_thread
 import os
 import re
 import time
@@ -100,6 +101,10 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
     def do_update_state(self):
         """ Called by gedit. Indicates that the state of the document changed. """
 
+        start_new_thread(self.__do_update_state, ())
+
+    def __do_update_state(self):
+
         if self._gitAction != None:
             if self._check_in_git(False):
                 self._gitAction.set_visible(True)
@@ -109,6 +114,7 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
         document = self.window.get_active_document()
         path = self._get_git_directory()
         if self._check_in_file(False) and self._check_in_git(False):
+
             filepath = document.get_location().get_path()
             try:
                 # gets the current state of a file (untracked; modified; staged; modified & staged)
