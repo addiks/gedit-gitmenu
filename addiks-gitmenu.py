@@ -10,7 +10,7 @@
  * @version 1.0
 """
 
-from gi.repository import Gtk, GObject, Gedit, PeasGtk, Gio
+from gi.repository import GLib, Gtk, GObject, Gedit, PeasGtk, Gio
 from compare_revision_window import CompareRevisionWindow
 from compare_branch_window import CompareBranchWindow
 from helpers import group, file_get_contents
@@ -155,7 +155,7 @@ class AddiksGitMenuWindow(GObject.Object, Gedit.WindowActivatable):
 
                     # set new title if changed
                     if(title != newTitle):
-                        self.window.set_title(newTitle)
+                        GLib.idle_add(self.window.set_title, newTitle)
             except OSError as error:
                 print(error)
 
